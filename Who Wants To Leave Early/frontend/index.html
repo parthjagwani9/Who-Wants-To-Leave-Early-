@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDG Quiz Night</title>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root { --blue: #4285F4; --red: #EA4335; --yellow: #FBBC04; --green: #34A853; --bg: #FAFAFA; --text: #202124; }
+        
+        /* 🎨 5. BACKGROUND DOODLES */
+        body { 
+            font-family: 'Google Sans', sans-serif; color: var(--text); margin: 0; 
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh; 
+            /* Subtle Geometric Pattern */
+            background-color: #f8f9fa;
+            background-image: radial-gradient(#dadce0 1.5px, transparent 1.5px), radial-gradient(#dadce0 1.5px, #f8f9fa 1.5px);
+            background-size: 30px 30px;
+            background-position: 0 0, 15px 15px;
+        }
+        
+        .app-card {
+            background: white; width: 90%; max-width: 600px; border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding: 2.5rem; text-align: center;
+            position: relative; overflow: hidden; margin-top: 3rem; transition: transform 0.3s ease;
+            z-index: 10;
+        }
+        .app-card::before {
+            content: ""; position: absolute; top: 0; left: 0; right: 0; height: 8px;
+            background: linear-gradient(90deg, var(--blue), var(--red), var(--yellow), var(--green));
+        }
+
+        /* 🖤 3. DARK ADMIN PANEL */
+        #admin-panel {
+            background: rgba(32, 33, 36, 0.95); color: white; width: 100%; padding: 15px; 
+            position: fixed; bottom: 0; left: 0; z-index: 999; display: none; 
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.4); text-align: center; backdrop-filter: blur(5px);
+        }
+        .admin-row { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .admin-btn { padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; font-size: 0.9rem; transition: 0.2s; }
+        .btn-go { background: var(--green); color: white; }
+        .btn-go:hover { transform: scale(1.05); }
+        .btn-reset { background: var(--yellow); color: black; }
+        .btn-kick-all { background: var(--red); color: white; }
+
+        /* 👢 KICK LIST STYLES */
+        #admin-player-list {
+            margin-top: 15px; max-height: 150px; overflow-y: auto; text-align: left; 
+            background: rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; display: none;
+        }
+        .kick-row { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem; }
+        .kick-btn { background: var(--red); color: white; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 0.8rem; margin-left: 10px; }
+        .toggle-players { background: transparent; color: #aaa; border: 1px solid #555; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-size: 0.8rem; margin-top: 5px; }
+
+        /* UI Elements */
+        h1 { margin: 0 0 0.5rem; font-size: 2rem; letter-spacing: -0.5px; }
+        .player-badge { background: #e8f0fe; color: var(--blue); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; margin-bottom: 20px; display: inline-block; }
+        
+        .timer-wrap { width: 100%; height: 10px; background: #f1f3f4; border-radius: 5px; margin: 25px 0; overflow: hidden; }
+        .timer-fill { height: 100%; width: 100%; background: var(--blue); transition: width 1s linear; }
+
+        .option {
+            background: white; border: 2px solid #dadce0; padding: 18px; border-radius: 16px; margin-bottom: 15px; cursor: pointer; text-align: left; font-weight: 500; font-size: 1.15rem; transition: 0.2s; position: relative;
+        }
+        .option:hover { transform: translateY(-2px); border-color: var(--blue); }
+        .option:active { transform: scale(0.98); }
+        .option.correct { background: #ceead6; border-color: var(--green); color: #0d652d; pointer-events: none; }
+        .option.wrong { background: #fad2cf; border-color: var(--red); color: #a50e0e; pointer-events: none; }
+        .option.disabled { pointer-events: none; opacity: 0.5; filter: grayscale(100%); }
+
+        /* Leaderboard */
+        .leader-item { display: flex; justify-content: space-between; padding: 15px 15px; border-bottom: 1px solid #f1f3f4; font-size: 1.2rem; align-items: center; }
+        .leader-item:first-child { background: #fff8e1; border: 2px solid var(--yellow); border-radius: 12px; margin-bottom: 10px; font-weight: bold; }
+
+        /* 🏆 1. VICTORY PODIUM */
+        .podium-container { display: flex; justify-content: center; align-items: flex-end; height: 250px; margin-top: 30px; gap: 10px; }
+        .podium-bar { width: 80px; border-radius: 10px 10px 0 0; color: white; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 10px; font-weight: bold; animation: popUp 1s ease-out; }
+        .p-gold { height: 200px; background: var(--yellow); order: 2; z-index: 2; box-shadow: 0 10px 20px rgba(251, 188, 4, 0.3); font-size: 1.5rem; }
+        .p-silver { height: 150px; background: #bdc3c7; order: 1; opacity: 0.9; }
+        .p-bronze { height: 110px; background: #cd7f32; order: 3; opacity: 0.9; }
+        .podium-avatar { font-size: 2.5rem; margin-bottom: 10px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        @keyframes popUp { from { height: 0; } }
+
+        input { padding: 15px; border: 2px solid #dadce0; border-radius: 12px; font-size: 1.1rem; width: 80%; outline: none; transition: 0.2s; }
+        input:focus { border-color: var(--blue); }
+        .join-btn { background: var(--blue); color: white; padding: 15px 40px; border-radius: 50px; border: none; font-weight: bold; font-size: 1.1rem; cursor: pointer; margin-top: 20px; transition: 0.2s; }
+        .join-btn:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(66, 133, 244, 0.3); }
+    </style>
+</head>
+<body>
+
+<div id="admin-panel">
+    <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 10px;">ADMIN CONTROLS</div>
+    
+    <div class="admin-row">
+        <span id="admin-status">Ready</span> 
+        <span style="opacity:0.3;">|</span> 
+        <span id="admin-p-count" style="color: #FBBC04;">Players: 0</span>
+    </div>
+    
+    <div class="admin-row" style="margin-top: 15px;">
+        <button class="admin-btn btn-go" onclick="triggerNextQuestion()">▶ Next Q</button>
+        <button class="admin-btn btn-reset" onclick="resetScores()">🔄 Reset Scores</button>
+        <button class="admin-btn btn-kick-all" onclick="resetData()">⚠️ Reset Data</button>
+    </div>
+
+    <button class="toggle-players" onclick="togglePlayerList()">Manage Players ▼</button>
+    <div id="admin-player-list"></div>
+</div>
+
+<div class="app-card">
+
+    <div id="screen-loading">
+        <h2 style="color:var(--blue)">Connecting...</h2>
+    </div>
+
+    <div id="screen-login" style="display:none;">
+        <div style="font-size: 3rem; margin-bottom: 10px;">🚀</div>
+        <h1>GDG Quiz Night</h1>
+        <p style="color: #5f6368;">Enter your name to join!</p>
+        <input type="text" id="username" placeholder="Nickname">
+        <br>
+        <button class="join-btn" onclick="joinGame()">Join Game</button>
+    </div>
+
+    <div id="screen-wait" style="display:none;">
+        <div style="font-size: 3rem; margin-bottom: 10px;">🎉</div>
+        <h1>You're In!</h1>
+        <div class="player-badge">👥 Players: <span id="wait-p-count">0</span></div>
+        <p id="wait-msg">Wait for the host...</p>
+        <div style="font-size: 2rem; margin-top: 20px; animation: bounce 1s infinite;">⏳</div>
+    </div>
+
+    <div id="screen-quiz" style="display:none;">
+        <div class="timer-wrap"><div id="timer-bar" class="timer-fill"></div></div>
+        <p style="color: #5f6368; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Question <span id="q-num">1</span></p>
+        <h2 id="q-text">Loading...</h2>
+        <div id="options-container"></div>
+    </div>
+
+    <div id="screen-leader" style="display:none;">
+        <div style="font-size: 3rem; margin-bottom: 10px;">📊</div>
+        <h1>Leaderboard</h1>
+        <div id="leader-list" style="text-align: left; margin-top:20px;"></div>
+        <p style="margin-top:20px; font-size:0.9rem; color:#888;">Next question coming soon...</p>
+    </div>
+
+    <div id="screen-victory" style="display:none;">
+        <div style="font-size: 1rem; color: #555; text-transform: uppercase; letter-spacing: 2px;">WINNERS</div>
+        <h1 style="color: var(--blue); font-size: 2.5rem; margin-top: 0;">GDG Quiz Champions</h1>
+        
+        <div id="victory-podium" class="podium-container">
+            </div>
+
+        <button class="join-btn" onclick="location.reload()" style="margin-top: 30px;">Play Again</button>
+    </div>
+
+</div>
+
+<script>
+    // ======================================================
+    // 🔴 STEP 1: FILL THESE 3 VARIABLES
+    // ======================================================
+    
+    const MY_SHEET_ID = "1NXorbO3KE4a8HMEjUTDAdYZkLr4GnbaXTadIpnzd0zw";
+    const MY_FIREBASE_API_KEY = "AIzaSyBgvcYnZVVu9jDQEnHiEyfIr7yN4ZtvVnE";
+    const MY_DATABASE_URL = "https://club-quiz-live-default-rtdb.firebaseio.com";
+
+    // ======================================================
+
+    // 🐼 2. MASCOTS
+    const AVATARS = ["🐼", "🐨", "🦁", "🐯", "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🦄", "🐲", "🤖", "👽", "🚀", "🔥", "🥑", "🍕"];
+
+    const sfxCorrect = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
+    const sfxWrong = new Audio('https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3');
+    const sfxWin = new Audio('https://assets.mixkit.co/active_storage/sfx/1992/1992-preview.mp3'); 
+
+    if (!firebase.apps.length) {
+        firebase.initializeApp({ apiKey: MY_FIREBASE_API_KEY, databaseURL: MY_DATABASE_URL });
+    }
+    const db = firebase.database();
+    
+    let myId = 'user_' + Math.floor(Math.random() * 1000000);
+    let myName = '';
+    let myAvatar = AVATARS[Math.floor(Math.random() * AVATARS.length)]; // Random mascot
+    let myScore = 0;
+    
+    let questions = [];
+    let allPlayers = [];
+    let isAdmin = window.location.search.includes('admin=true');
+    let timerInterval;
+
+    // --- LISTENERS ---
+
+    if (isAdmin) {
+        document.getElementById('admin-panel').style.display = 'block';
+        loadQuestions();
+    }
+
+    db.ref('gameState').on('value', (snap) => {
+        document.getElementById('screen-loading').style.display = 'none';
+        const state = snap.val();
+        
+        if (!state) {
+            if(!myName) document.getElementById('screen-login').style.display = 'block';
+            return;
+        }
+
+        // Hide all
+        ['screen-login', 'screen-wait', 'screen-quiz', 'screen-leader', 'screen-victory'].forEach(id => 
+            document.getElementById(id).style.display = 'none'
+        );
+
+        if (state.status === 'VICTORY') {
+            document.getElementById('screen-victory').style.display = 'block';
+            renderVictory();
+            sfxWin.play();
+            confetti({ particleCount: 300, spread: 150 });
+        }
+        else if (state.status === 'WAITING') {
+            if (myName) document.getElementById('screen-wait').style.display = 'block';
+            else document.getElementById('screen-login').style.display = 'block';
+        }
+        else if (state.status === 'QUESTION') {
+            document.getElementById('screen-quiz').style.display = 'block';
+            renderQuestion(state.qData, state.qNum);
+            runTimerClient(state.endTime, state.duration);
+        }
+        else if (state.status === 'LEADERBOARD') {
+            document.getElementById('screen-leader').style.display = 'block';
+            renderLeaderboard(); 
+        }
+    });
+
+    db.ref('players').on('value', (snap) => {
+        const val = snap.val();
+        allPlayers = val ? Object.values(val) : [];
+        
+        // Update Admin UI
+        document.getElementById('admin-p-count').innerText = `Players: ${allPlayers.length}`;
+        document.getElementById('wait-p-count').innerText = allPlayers.length;
+        
+        if (isAdmin) renderAdminPlayerList(val); // Update kick list
+
+        // KICK LOGIC
+        if (myName && (!val || !val[myId])) {
+            alert("Connection reset or you were kicked.");
+            location.reload(); 
+        }
+
+        if (document.getElementById('screen-leader').style.display === 'block') {
+            renderLeaderboard();
+        }
+    });
+
+    // --- PLAYER FUNCTIONS ---
+
+    function joinGame() {
+        const input = document.getElementById('username');
+        if (!input.value) return alert("Name required!");
+        myName = input.value;
+        
+        db.ref(`players/${myId}`).set({ 
+            name: myName, 
+            score: 0, 
+            avatar: myAvatar,
+            id: myId 
+        });
+        document.getElementById('screen-login').style.display = 'none';
+        document.getElementById('screen-wait').style.display = 'block';
+    }
+
+    function renderQuestion(q, num) {
+        document.getElementById('q-text').innerText = q.q;
+        document.getElementById('q-num').innerText = num + 1;
+        const div = document.getElementById('options-container');
+        div.innerHTML = '';
+
+        q.opts.forEach((opt, idx) => {
+            const btn = document.createElement('div');
+            btn.className = 'option';
+            btn.innerText = opt;
+            btn.onclick = () => submitAnswer(idx, q.correct, btn);
+            div.appendChild(btn);
+        });
+    }
+
+    function submitAnswer(idx, correct, btn) {
+        document.querySelectorAll('.option').forEach(el => el.classList.add('disabled'));
+
+        if (idx === correct) {
+            btn.classList.add('correct');
+            sfxCorrect.play();
+            myScore += 100; // Fixed score for stability
+            confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
+            db.ref(`players/${myId}/score`).set(myScore);
+        } else {
+            btn.classList.add('wrong');
+            sfxWrong.play();
+            const opts = document.querySelectorAll('.option');
+            opts[correct].classList.add('correct');
+            opts[correct].classList.remove('disabled');
+        }
+    }
+
+    function runTimerClient(endTime, duration) {
+        clearInterval(timerInterval);
+        const bar = document.getElementById('timer-bar');
+        
+        timerInterval = setInterval(() => {
+            const left = Math.max(0, endTime - Date.now());
+            const pct = (left / duration) * 100;
+            
+            bar.style.width = pct + "%";
+            if (pct < 30) bar.style.background = "var(--red)";
+            else bar.style.background = "var(--blue)";
+
+            if (left <= 0) clearInterval(timerInterval);
+        }, 100);
+    }
+
+    function renderLeaderboard() {
+        const div = document.getElementById('leader-list');
+        div.innerHTML = '';
+        const sorted = [...allPlayers].sort((a, b) => b.score - a.score);
+
+        sorted.forEach((p, i) => {
+            div.innerHTML += `
+                <div class="leader-item">
+                    <div>
+                        <span style="margin-right:8px;">${p.avatar}</span>
+                        ${p.name}
+                    </div>
+                    <div style="font-weight:bold;">${p.score}</div>
+                </div>`;
+        });
+    }
+
+    // 🏆 VICTORY RENDER
+    function renderVictory() {
+        const div = document.getElementById('victory-podium');
+        div.innerHTML = '';
+        const sorted = [...allPlayers].sort((a, b) => b.score - a.score).slice(0, 3); // Top 3
+
+        if(sorted[1]) createPodiumBar(sorted[1], 'p-silver', '2nd'); // Silver Left
+        if(sorted[0]) createPodiumBar(sorted[0], 'p-gold', '1st');   // Gold Center
+        if(sorted[2]) createPodiumBar(sorted[2], 'p-bronze', '3rd'); // Bronze Right
+
+        function createPodiumBar(p, cls, rank) {
+            div.innerHTML += `
+                <div class="podium-bar ${cls}">
+                    <div class="podium-avatar">${p.avatar}</div>
+                    <div>${p.name}</div>
+                    <div style="font-size:0.8rem; opacity:0.8;">${p.score} pts</div>
+                </div>`;
+        }
+    }
+
+    // --- ADMIN ---
+
+    async function loadQuestions() {
+        try {
+            const url = `https://docs.google.com/spreadsheets/d/${MY_SHEET_ID}/gviz/tq?tqx=out:json`;
+            const res = await fetch(url);
+            const txt = await res.text();
+            const json = JSON.parse(txt.substring(47).slice(0, -2));
+            
+            questions = json.table.rows.map(row => {
+                const c = row.c;
+                if (!c[0]) return null;
+                return {
+                    q: c[0]?.v,
+                    opts: [c[1]?.v, c[2]?.v, c[3]?.v, c[4]?.v],
+                    time: parseInt(c[5]?.v) || 20, 
+                    correct: (parseInt(c[6]?.v) || 1) - 1
+                };
+            }).filter(q => q);
+        } catch (e) { alert("Admin Load Error: Check Sheet ID"); }
+    }
+
+    let currentQ = -1;
+
+    window.triggerNextQuestion = function() {
+        currentQ++;
+        if (currentQ >= questions.length) {
+            db.ref('gameState').update({ status: 'VICTORY' }); // 🏆 End Game
+            return;
+        }
+
+        const q = questions[currentQ];
+        const durationMS = q.time * 1000;
+        const endTime = Date.now() + durationMS;
+
+        db.ref('gameState').set({
+            status: 'QUESTION',
+            qData: q,
+            qNum: currentQ,
+            endTime: endTime,
+            duration: durationMS
+        });
+
+        setTimeout(() => {
+            db.ref('gameState').update({ status: 'LEADERBOARD' });
+        }, durationMS + 2000); 
+    };
+
+    window.resetScores = function() {
+        if (!confirm("Keep players but set scores to 0?")) return;
+        currentQ = -1;
+        db.ref('players').once('value', snap => {
+            if(!snap.exists()) return;
+            const updates = {};
+            Object.keys(snap.val()).forEach(key => updates[`players/${key}/score`] = 0);
+            updates['gameState'] = { status: 'WAITING' };
+            db.ref().update(updates);
+        });
+    };
+
+    window.resetData = function() {
+        if (!confirm("⚠️ KICK EVERYONE?")) return;
+        currentQ = -1;
+        db.ref('gameState').set({ status: 'WAITING' });
+        db.ref('players').remove();
+    };
+
+    // 👢 ADMIN KICK LOGIC
+    function togglePlayerList() {
+        const list = document.getElementById('admin-player-list');
+        list.style.display = list.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function renderAdminPlayerList(playersVal) {
+        const list = document.getElementById('admin-player-list');
+        list.innerHTML = '';
+        if(!playersVal) return;
+        
+        Object.values(playersVal).forEach(p => {
+            list.innerHTML += `
+                <div class="kick-row">
+                    <span>${p.avatar} ${p.name}</span>
+                    <button class="kick-btn" onclick="kickPlayer('${p.id}')">❌</button>
+                </div>`;
+        });
+    }
+
+    window.kickPlayer = function(id) {
+        if(confirm("Kick this player?")) {
+            db.ref(`players/${id}`).remove();
+        }
+    }
+
+</script>
+</body>
+</html>

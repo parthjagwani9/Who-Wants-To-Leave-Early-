@@ -1,0 +1,229 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Event Notes",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Event_Notes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9886466e-bbf0-494a-9f43-e3a44c785998",
+      "name": "On form submission",
+      "webhookId": "44a1b71e-986e-40eb-aecd-e043698520d6"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyCAZqot7HRgTbH1_yKFK08WoIZwvB5oKx4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"You are a quiz master. Based on these notes: {{ $json.Event_Notes.replace(/\\n/g, \" \").replace(/\"/g, \"'\") }}, generate 10 multiple choice questions. Return the answer strictly as a JSON array where each item has 'Question', 'Answer1', 'Answer2', 'Answer3', 'Answer4', 'TimeLimit' (integer 20), and 'CorrectAnswer' (integer 1-4).\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "29456a65-7c5d-4f43-8aed-654364d780c2",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the text response from Google\nconst responseText = items[0].json.candidates[0].content.parts[0].text;\n\n// 2. Clean up any \"Markdown\" formatting (Gemini likes to add ```json at the start)\nconst cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();\n\n// 3. Convert the text string into actual data (JSON)\nconst quizData = JSON.parse(cleanedText);\n\n// 4. Return the data so the next node can use it\nreturn quizData;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "54846d50-478a-42bd-bd64-1605f9f686d2",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1NXorbO3KE4a8HMEjUTDAdYZkLr4GnbaXTadIpnzd0zw",
+          "mode": "list",
+          "cachedResultName": "Club Event Quiz",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NXorbO3KE4a8HMEjUTDAdYZkLr4GnbaXTadIpnzd0zw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NXorbO3KE4a8HMEjUTDAdYZkLr4GnbaXTadIpnzd0zw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Question": "={{ $json.Question }}",
+            "Answer 1": "={{ $json.Answer1 }}",
+            "Answer 4": "={{ $json.Answer4 }}",
+            "Answer 2": "={{ $json.Answer2 }}",
+            "Answer 3": "={{ $json.Answer3 }}",
+            "Time limit": "20",
+            "Correct answer": "={{ $json.CorrectAnswer }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Question",
+              "displayName": "Question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Answer 1",
+              "displayName": "Answer 1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Answer 2",
+              "displayName": "Answer 2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Answer 3",
+              "displayName": "Answer 3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Answer 4",
+              "displayName": "Answer 4",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time limit",
+              "displayName": "Time limit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Correct answer",
+              "displayName": "Correct answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        624,
+        0
+      ],
+      "id": "f28fa180-0fac-487a-8e0e-886badaf57a9",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YLrEE7SQEFWxfUe6",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e98765af-77bb-43ae-9ba7-db1ed516dbba",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f8b46cd31e8eb34d7f6be2a383b1c46115d2bd2ae5f94e082da89b84edc60913"
+  },
+  "id": "UoCSTTDnMhHvSx2F",
+  "tags": []
+}
