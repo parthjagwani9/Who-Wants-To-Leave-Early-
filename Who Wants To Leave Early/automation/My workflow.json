@@ -32,7 +32,7 @@
           "parameters": [
             {
               "name": "key",
-              "value": "AIzaSyCAZqot7HRgTbH1_yKFK08WoIZwvB5oKx4"
+              "value": "YOUR_GEMINI_KEY_HERE"
             }
           ]
         },
